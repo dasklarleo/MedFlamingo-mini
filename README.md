@@ -149,6 +149,7 @@ FlamingoModel *-- FlamingoBaseModel
 FlamingoBaseModel *-- CLIPVisionModel
 FlamingoBaseModel <|-- FlamingoOPT
 FlamingoBaseModel <|-- FlamingoGPT2
+FlamingoBaseModel <|-- FlamingoBioGPT
 ```
 
 ## Acknowledgements
