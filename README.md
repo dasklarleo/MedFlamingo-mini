@@ -135,9 +135,13 @@ class FlamingoBaseModel {
   _init_layers()
   ...
 }
+class FlamingoBioGPT {
+  OPTModel lm
+}
 class FlamingoOPT {
   OPTModel lm
 }
+
 class FlamingoGPT2 {
   GPT2Model lm
 }
