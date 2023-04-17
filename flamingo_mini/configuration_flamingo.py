@@ -5,10 +5,12 @@ class FlamingoConfig(PretrainedConfig):
     
     def __init__(
         self,
-        lm: str = 'gpt2',
-        clip_model_type: str = 'openai/clip-vit-base-patch32',
+        # lm: str = 'gpt2',
+        # clip_model_type: str = 'openai/clip-vit-base-patch32',
+        lm:str='microsoft/biogpt',
+        clip_model_type: str = 'flax-community/medclip-roco',
         dim: int = 1024,
-        dim_visual: int = 768,
+        dim_visual: int = 512,
         xattn_every: int = 1,
         xattn_dim_head: int = 64,
         xattn_heads: int = 8,

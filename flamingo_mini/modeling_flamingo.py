@@ -17,6 +17,8 @@ from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast
 )
+from transformers.configuration_utils import PretrainedConfig
+from VisualModels.ChexPert import load_pretrain_ChexPert
 
 from .configuration_flamingo import FlamingoConfig
 from .flamingo_processor import FlamingoProcessor
@@ -42,13 +44,13 @@ def suppress_model_loading_warnings(suppress: bool = True):
 
 class FlamingoBaseModel(ABC, PreTrainedModel):
     """ 
-    abstract class, which is inherited by FlamingoGPT2 and FlamingoOPT.
+    abstract class, which is inherited by FlamingoGPT2, FlamingoOPT or FlamingoBioGPT.
     This class provides the core functionalities of Flamingo: the forward() function,
     setting up the resampler and hijacking the LM layers with GatedXAttn layers.
     """
 
     config: FlamingoConfig
-    vision_encoder: CLIPVisionModel
+    #vision_encoder: CLIPVisionModel # This needs to be adjusted. TODO: Replace this with the ChexPert
     resampler: PerceiverResampler
     lm: PreTrainedModel
     lm_head: nn.Linear
@@ -60,7 +62,8 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
         super().__init__(config)
         
         with suppress_model_loading_warnings(suppress_warnings):
-            self.vision_encoder = CLIPVisionModel.from_pretrained(config.clip_model_type) # type: ignore
+            #self.vision_encoder = CLIPVisionModel.from_pretrained(config.clip_model_type,from_flax=True) # type: ignore
+            self.vision_encoder=load_pretrain_ChexPert.load_pretrained_model('/home/leosher/桌面/project/MedFlamingo-mini/VisualModels/ChexPert/config/pre_train.pth','/home/leosher/桌面/project/MedFlamingo-mini/VisualModels/ChexPert/config/example.json')
 
         self.resampler = PerceiverResampler(
             dim=config.dim_visual,
@@ -167,8 +170,9 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
             raise ValueError('pixel_values must have ndim 5 or 6!')
 
         with torch.no_grad():
-            visual_features = self.vision_encoder(pixel_values).last_hidden_state         # (b N T) v d
-
+            #visual_features = self.vision_encoder(pixel_values).last_hidden_state         # (b N T) v d
+            visual_features = self.vision_encoder(pixel_values)[0]
+            visual_features = visual_features.reshape(visual_features.shape[0],1,-1)#TODO: what is the v?
         # perceiver resampler
         # (only need to do if kv of the xattn layers were not calculated yet.)
         # resample visual features ((b N T) v d) -> (b N T q d)
@@ -305,6 +309,29 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
             attentions=out.attentions,
         )
 
+class FlamingoBioGPT(FlamingoBaseModel):
+    config: FlamingoConfig
+    config_class = FlamingoConfig
+
+    def __init__(self, config: FlamingoConfig):
+        from transformers import BioGptForCausalLM, BioGptModel
+        assert config.lm.startswith('microsoft/biogpt')
+        super().__init__(config)
+
+        base_lm: BioGptForCausalLM = BioGptForCausalLM.from_pretrained(config.lm)  # type: ignore
+        
+        assert self.config.dim == base_lm.config.hidden_size, \
+            f"specified {self.config.dim=} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.hidden_size}"
+
+        base_lm.resize_token_embeddings(base_lm.config.vocab_size + 1)
+        self.lm: BioGptModel = base_lm.biogpt
+        self.lm_head = base_lm.output_projection
+        self._init_layers(self.lm.layers)
+        
+    def get_modified_layers(self):
+        if self.config.xattn_every == 1:
+            return self.lm.layers
+        return filter(lambda layer: isinstance(layer, ModifiedLMBlock), self.lm.layers)
 
 class FlamingoGPT2(FlamingoBaseModel):
     config: FlamingoConfig
@@ -357,7 +384,7 @@ class FlamingoOPT(FlamingoBaseModel):
 
 
 class FlamingoModel(PreTrainedModel):
-    """wrapper class for a FlamingoBase decending model (FlamingoGPT2 or FlamingoOPT)
+    """wrapper class for a FlamingoBase decending model (FlamingoGPT2 or FlamingoOPT, or FlamingoBioGPT)
 
     A generic flamingo interface that is independent of the underlying LM. Most of the methods are just forwarding to the actual model.
     This class implements prepare_inputs_for_generation() and reorder_cache(), which are required to utilize hf text generation methods.
@@ -370,7 +397,8 @@ class FlamingoModel(PreTrainedModel):
     # value = Flamingo class for the respective language model
     _LANGUAGE_MODEL_VERSIONS = {
         'gpt2': FlamingoGPT2,
-        'facebook/opt': FlamingoOPT
+        'facebook/opt': FlamingoOPT,
+        'microsoft/biogpt': FlamingoBioGPT
     }
     
     _keys_to_ignore_on_load_missing = [r"flamingo.vision_encoder"]
@@ -383,10 +411,10 @@ class FlamingoModel(PreTrainedModel):
                 config for the flamingo model.
             model_class (Optional[type], optional): 
                 optionally use a custom class that inherits FlamingoBaseModel. 
-                If none, it will choose FlamingoGPT2 or FlamingoOPT based on the FlamingoConfig. Defaults to None.
+                If none, it will choose FlamingoGPT2 or FlamingoOPT  or BioGPT based on the FlamingoConfig. Defaults to None.
         """
         super().__init__(config)
-
+        print(isinstance(config,PretrainedConfig))
         if model_class is None:
             model_class = self._find_flamingo_class(config.lm)
         self.flamingo: FlamingoBaseModel = model_class(config)

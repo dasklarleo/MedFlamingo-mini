@@ -44,12 +44,12 @@ model.to(device)
 processor = FlamingoProcessor(config, device=device)
 ```
 ### Parameters
-You can specify the architecture by passing the following parameters to FlamingoConfig():  
+You can specify the architecture by passing the following parameters to FlamingoConfig() on `flamingo_mini/flamingo_processor.py`:  
 ```python
 lm: str = 'gpt2'                    # select language model. Possible values: gpt2, gpt2-*, facebook/opt-*
 clip_model_type: str = 'openai/clip-vit-base-patch32'      
                                     # vision encoder. Possible other: openai/clip-vit-large-patch14
-dim: int = 1024                     # length of a language token, depends on used language model
+dim: int = 1024                     # length of a language token, depends on used language model which is just the n_positions
 dim_visual: int = 768               # length of a visual feature, depends on the vision encoder
 xattn_every: int = 1                # frequency of interleaved xattn layers
 xattn_dim_head: int = 64

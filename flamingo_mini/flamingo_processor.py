@@ -5,6 +5,8 @@ from PIL import Image
 import torch
 from transformers import CLIPImageProcessor
 
+from medclip import MedCLIPModel, MedCLIPVisionModelViT
+from medclip import MedCLIPProcessor
 from .configuration_flamingo import FlamingoConfig
 
 
@@ -12,9 +14,10 @@ class FlamingoProcessor:
     """ 
     FlamingoProcessor offers functions to preprocess the raw data (images and text).
     Wrapper around a transformer GPT-2 tokenizer and a clip processor.
+    Here we want to add the BioGPT and MediCLIP to the original flamingo
     """
     
-    vision_processor: CLIPImageProcessor
+    vision_processor: CLIPImageProcessor()
 
     def __init__(
         self,
@@ -30,7 +33,7 @@ class FlamingoProcessor:
         """
         self.config = config
         self.eoc_token = eoc_token
-        self.vision_processor = CLIPImageProcessor.from_pretrained(config.clip_model_type) #type: ignore
+        self.vision_processor = CLIPImageProcessor() #type: ignore
         
         if config.lm.startswith('gpt2'):
             if use_fast:
@@ -45,7 +48,10 @@ class FlamingoProcessor:
             from transformers import AutoTokenizer
             
             self.tokenizer = AutoTokenizer.from_pretrained('facebook/opt-30b', use_fast=use_fast)
-        
+        elif config.lm.startswith('microsoft/biogpt'):
+            from transformers import AutoTokenizer
+
+            self.tokenizer = AutoTokenizer.from_pretrained('microsoft/biogpt', use_fast=use_fast)
         self.tokenizer.add_bos_token = True
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.add_tokens(self.eoc_token)
@@ -126,7 +132,6 @@ class FlamingoProcessor:
         :return: Tensor of shape [n_images, width, height, depth]
         """
         return self.vision_processor(images=images, return_tensors="pt", padding=True)
-
     def __call__(
         self, 
         images: Image.Image | List[Image.Image] | torch.Tensor | List[torch.Tensor] | None = None, 
