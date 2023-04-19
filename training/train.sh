@@ -1,7 +1,7 @@
 #!/bin/env bash
 
-export CUDA_VISIBLE_DEVICES=2,3
-NUM_GPU=2
+export CUDA_VISIBLE_DEVICES=0
+NUM_GPU=1
 
 ARGS="
 --output_dir ./flamingo-coco
@@ -30,7 +30,7 @@ echo $ARGS
 
 if [ $NUM_GPU == 1 ]; then
     echo "running on a single GPU"
-    python ./train.py $ARGS
+    /home/leosher/anaconda3/bin/python ./train.py $ARGS
 else
     echo "running on multiple GPUs"
     torchrun --nproc_per_node $NUM_GPU ./train.py $ARGS

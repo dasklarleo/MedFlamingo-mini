@@ -29,17 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 # get images and annotations from https://cocodataset.org/#download
-COCO_ROOT      = '/nfs/data3/zhangya/coco2017/images'
-COCO_ANN_TRAIN = '/nfs/data3/hansmair/coco2017/captions_train2017.json'
-COCO_ANN_VAL   = '/nfs/data3/hansmair/coco2017/captions_val2017.json'
+COCO_ROOT      = '/media/leosher/soliddisk_data/CoCo'
+COCO_ANN_TRAIN = '/media/leosher/soliddisk_data/CoCo/annotations/captions_train2017.json'
+COCO_ANN_VAL   = '/media/leosher/soliddisk_data/CoCo/annotations/captions_val2017.json'
 
+chex_image_dir = '/home/leosher/桌面/chex_data'
 
 class CLIPImageTransform:
     """ experimental. A transform that does apply the transforms of a default CLIPFeatureExtractor """
     vision_processor: CLIPImageProcessor
 
     def __init__(self, clip_model_type: str):
-        self.vision_processor = CLIPImageProcessor.from_pretrained(clip_model_type) # type: ignore
+        self.vision_processor = CLIPImageProcessor.from_pretrained(clip_model_type) # TODO: add the BioMedClip
 
     def __call__(self, image) -> torch.Tensor:
         return self.vision_processor(images=image, return_tensors="pt", padding=True)['pixel_values']
@@ -48,20 +49,25 @@ class CLIPImageTransform:
 def prepare_training_dataset(config: FlamingoConfig):
     """ prepare a CocoCaptions training dataset """
     transform = T.Compose([
-        T.RandomHorizontalFlip(),                       # add your favorite transforms
+        # T.RandomHorizontalFlip(),                       # add your favorite transforms
         CLIPImageTransform(config.clip_model_type)
     ])
 
     def target_transform(captions):
         return f"{random.choice(['', ' '])}<image>{random.choice(captions)}<EOC></s>"
-
-    return CocoCaptions(
+    train=CocoCaptions(
         COCO_ROOT, 
         COCO_ANN_TRAIN, 
         transform=transform,
         target_transform=target_transform
     )
+    print(type(train))
+    print(train)
+    return train
+
+def prepare_chex_training_dataset():
     
+    pass
 
 def prepare_evaluation_dataset(config: FlamingoConfig):
     return CocoCaptions(COCO_ROOT, COCO_ANN_VAL, 
@@ -73,7 +79,7 @@ class DataCollator:
         self.processor = FlamingoProcessor(config)
         
     def __call__(self, batch):
-        pixel_values, sentences = zip(*batch)
+        pixel_values, sentences = zip(*batch) #[[[img-1.1,img-1.2]],[img-2.1]...],  [senten-1, senten-2]
         inputs = self.processor(text=sentences)
         pixel_values = torch.stack(pixel_values)
         
@@ -105,7 +111,6 @@ class FlamingoTrainer(Trainer):
         metric_key_prefix: str = "eval"
     ) -> Dict[str, float]:
         """ override evaluation method to inject custom behavior. 
-        TODO this only runs on one GPU, how to do distributed evaluation?
         """
         metrics = evaluate_image_captioning(self.eval_dataset, self.model, 
             prefix=self.args.eval_coco_captioning_prefix,
@@ -161,14 +166,15 @@ if __name__ == '__main__':
     # datasets
     #################################################################
     logger.info('loading datasets...')
-    train_dataset = prepare_training_dataset(config)
+    train_dataset = prepare_training_dataset(config) # train_dataset (`torch.utils.data.Dataset` or `torch.utils.data.IterableDataset`, *optional*):
+            # The dataset to use for training. If it is a [`~datasets.Dataset`], columns not accepted by the
+            # model.forward()` method are automatically removed.
     eval_dataset = prepare_evaluation_dataset(config)
-    
+    print(train_dataset[-1])
     #################################################################
     # optimizer, scheduler, trainer
     #################################################################
-    # optimizer = AdamW(model.parameters_trainable(), training_args.learning_rate)
-    # scheduler = get_constant_schedule_with_warmup(optimizer, training_args.warmup_steps)
+
 
     trainer = FlamingoTrainer(
         model,

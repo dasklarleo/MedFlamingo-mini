@@ -17,8 +17,9 @@ from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast
 )
+import open_clip
 from transformers.configuration_utils import PretrainedConfig
-from VisualModels.ChexPert import load_pretrain_ChexPert
+#from VisualModels.ChexPert import load_pretrain_ChexPert
 
 from .configuration_flamingo import FlamingoConfig
 from .flamingo_processor import FlamingoProcessor
@@ -50,7 +51,7 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
     """
 
     config: FlamingoConfig
-    #vision_encoder: CLIPVisionModel # This needs to be adjusted. TODO: Replace this with the ChexPert
+    #vision_encoder: CLIPVisionModel # This needs to be adjusted. TODO: Replace this with the BioMedCLIP
     resampler: PerceiverResampler
     lm: PreTrainedModel
     lm_head: nn.Linear
@@ -63,7 +64,8 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
         
         with suppress_model_loading_warnings(suppress_warnings):
             #self.vision_encoder = CLIPVisionModel.from_pretrained(config.clip_model_type,from_flax=True) # type: ignore
-            self.vision_encoder=load_pretrain_ChexPert.load_pretrained_model('/home/leosher/桌面/project/MedFlamingo-mini/VisualModels/ChexPert/config/pre_train.pth','/home/leosher/桌面/project/MedFlamingo-mini/VisualModels/ChexPert/config/example.json')
+            model,_,_ = open_clip.create_model_and_transforms('hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224')
+            self.vision_encoder=model.visual
 
         self.resampler = PerceiverResampler(
             dim=config.dim_visual,
@@ -171,8 +173,11 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
 
         with torch.no_grad():
             #visual_features = self.vision_encoder(pixel_values).last_hidden_state         # (b N T) v d
-            visual_features = self.vision_encoder(pixel_values)[0]
-            visual_features = visual_features.reshape(visual_features.shape[0],1,-1)#TODO: what is the v?
+            visual_features = self.vision_encoder(pixel_values)
+            visual_features = visual_features.reshape(visual_features.shape[0],-1,visual_features.shape[-1])
+            print(visual_features.shape)
+            #visual_features = self.vision_encoder(pixel_values)[0]
+            #visual_features = visual_features.reshape(visual_features.shape[0],1,-1)#TODO: what is the v?
         # perceiver resampler
         # (only need to do if kv of the xattn layers were not calculated yet.)
         # resample visual features ((b N T) v d) -> (b N T q d)
