@@ -48,38 +48,33 @@ class Chex:
         :return:
         """
         # load dataset
-        self.dataset,self.anns,self.imgs = dict(),dict(),dict()
+        self.dataset,self.anns,self.imgs = {'images':{},'annotations':{}},dict(),dict()
         self.imgToAnns = defaultdict(list)
+        self.img_dir=''
         if not annotation_file == None:
             print('loading annotations into memory...')
             tic = time.time()
             with open(annotation_file, 'r') as f:
                 dataset = json.load(f)
-            assert type(dataset)==dict, 'annotation file format {} not supported'.format(type(dataset))
             print('Done (t={:0.2f}s)'.format(time.time()- tic))
-            self.dataset = dataset
-            self.createIndex()
+            for i in range(len(dataset)):
+                txt_path=dataset[i]['txt_path']
+                self.img_dir='/home/leosher/桌面/chex_data'+(txt_path[6:]).replace('.json', '/')
+                files = os.listdir(self.img_dir)
+                files.remove('index.html')
+                for file_index in range(len(files)):
+                    files[file_index] = self.img_dir + files[file_index]
 
-    def createIndex(self):
-        # create index
-        print('creating index...')
-        anns, imgs = {}, {}
-        AnnToImages = defaultdict(list)
-        if 'images' in self.dataset:
-            for img in self.dataset['iamges']: #self.dataset['iamges']是一个json文件，包含了每一个image的meta信息:{'annotation_id,'id','file_path'}
-                AnnToImages[imgs['ann_id']].append(img) # 每一个image都要包含一个ann_id的索引
-                imgs[img['id']] = img
+                self.dataset['images'][i]=({'file_name':files, 'annotation_id':i, 'id':i})
+                print(files)
+                report = dataset[i]['report']
+                report = report.replace('Findings:\n', '')
+                report = report.replace('Impression:\n', '')
+                self.dataset['annotations'][i]=({'id':i, 'annotations': report})
+        self.anns = self.dataset['annotations']
+        self.imgs = self.dataset['images']
 
-        if 'annotations' in self.dataset:
-            for ann in self.dataset['annotations']:
-                anns[ann['id']] = ann
 
-        print('index created!')
-
-        # create class members
-        self.anns = anns
-        self.AnnToImages = AnnToImages
-        self.imgs = imgs
 
     def loadAnns(self, ids=[]):
         """
@@ -88,7 +83,7 @@ class Chex:
         :return: anns (object array) : loaded ann objects
         """
         if _isArrayLike(ids):
-            return [self.anns[id] for id in ids]
+            return [self.anns[id] for id in ids]# 返回一个列表
         elif type(ids) == int:
             return [self.anns[ids]]
 
@@ -96,7 +91,7 @@ class Chex:
         """
         Load anns with the specified ids.
         :param ids (int array)       : integer ids specifying img
-        :return: imgs (object array) : loaded img objects
+        :return: imgs (object array) : loaded img objects TODO:modify this for multiple images load
         """
         if _isArrayLike(ids):
             return [self.imgs[id] for id in ids]

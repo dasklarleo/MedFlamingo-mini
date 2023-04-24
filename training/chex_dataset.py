@@ -1,8 +1,8 @@
 import os.path
 from typing import Any, Callable, List, Optional, Tuple
-
+import sys
 from PIL import Image
-
+#sys.path.append('/home/leosher/桌面/project/MedFlamingo-mini/training/')
 from torchvision.datasets.vision import VisionDataset
 from chex_class import Chex
 
@@ -31,14 +31,23 @@ class ChexPert(VisionDataset):
         super().__init__(root, transforms, transform, target_transform)
 
         self.coco = Chex(annFile)
-        self.ids = list(sorted(self.coco.imgs.keys()))
+        self.ids = list(sorted(self.coco.anns.keys()))
 
     def _load_image(self, id: int) -> Image.Image:
-        path = self.coco.loadImgs(id)[0]["file_name"]
-        return Image.open(os.path.join(self.root, path)).convert("RGB")
-
+        file_names = self.coco.loadImgs(id)[0]["file_name"]
+        images=[]
+        i = 0
+        for file in file_names:
+            images.append(Image.open(file).convert("RGB"))
+            i+=1
+        if i<3:
+            while i<3:
+                i+=1
+                images.append(Image.open(file_names[0]).convert("RGB"))
+        return images #[N, H, W, 3]
+    
     def _load_target(self, id: int) -> List[Any]:
-        return self.coco.loadAnns(self.coco.getAnnIds(id))
+        return self.coco.loadAnns(id)
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         id = self.ids[index]
@@ -54,11 +63,8 @@ class ChexPert(VisionDataset):
         return len(self.ids)
 
 
-class CocoCaptions(CocoDetection):
-    """`MS Coco Captions <https://cocodataset.org/#captions-2015>`_ Dataset.
-
-    It requires the `COCO API to be installed <https://github.com/pdollar/coco/tree/master/PythonAPI>`_.
-
+class ChexCaptions(ChexPert):
+    """
     Args:
         root (string): Root directory where images are downloaded to.
         annFile (string): Path to json annotation file.
@@ -98,4 +104,4 @@ class CocoCaptions(CocoDetection):
     """
 
     def _load_target(self, id: int) -> List[str]:
-        return [ann["caption"] for ann in super()._load_target(id)]
+        return [ann["annotations"] for ann in super()._load_target(id)]

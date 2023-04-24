@@ -24,7 +24,8 @@ from flamingo_mini import FlamingoConfig, FlamingoModel, FlamingoProcessor
 
 from eval import evaluate_image_captioning  # don't ask me why this import works
 
-
+import chex_dataset
+from chex_dataset import ChexCaptions
 logger = logging.getLogger(__name__)
 
 
@@ -55,9 +56,9 @@ def prepare_training_dataset(config: FlamingoConfig):
 
     def target_transform(captions):
         return f"{random.choice(['', ' '])}<image>{random.choice(captions)}<EOC></s>"
-    train=CocoCaptions(
-        COCO_ROOT, 
-        COCO_ANN_TRAIN, 
+    train=ChexCaptions(
+        chex_image_dir, 
+        '/home/leosher/桌面/chex_data/test.json', 
         transform=transform,
         target_transform=target_transform
     )
@@ -72,7 +73,6 @@ def prepare_chex_training_dataset():
 def prepare_evaluation_dataset(config: FlamingoConfig):
     return CocoCaptions(COCO_ROOT, COCO_ANN_VAL, 
         transform=CLIPImageTransform(config.clip_model_type))
-
 
 class DataCollator:
     def __init__(self, config: FlamingoConfig):
@@ -93,7 +93,6 @@ class DataCollator:
 @dataclass
 class FlamingoTrainingArguments(TrainingArguments):
     """ custom arguments """
-    eval_coco_captioning_prefix: str = field(default="<image>A picture of")         # It's a common thing to do for COCO image captioning
     eval_coco_captioning_start: int = field(default=0)
     eval_coco_captioning_end: int = field(default=1000)
     
