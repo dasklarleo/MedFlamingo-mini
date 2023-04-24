@@ -45,9 +45,8 @@ def suppress_model_loading_warnings(suppress: bool = True):
 
 class FlamingoBaseModel(ABC, PreTrainedModel):
     """ 
-    abstract class, which is inherited by FlamingoGPT2, FlamingoOPT or FlamingoBioGPT.
-    This class provides the core functionalities of Flamingo: the forward() function,
-    setting up the resampler and hijacking the LM layers with GatedXAttn layers.
+    Abstract class, which is inherited by FlamingoBioGPT.
+    This class provides the core functionalities of Flamingo: the forward() function, setting up the resampler and hijacking the LM layers with GatedXAttn layers.
     """
 
     config: FlamingoConfig
@@ -206,14 +205,12 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
     ) -> CausalLMOutputWithPast:
         """Flamingo forward pass
 
-        Most of the parameters are inspired by huggingface language model implementations, so this doc may be informative:
-        https://huggingface.co/docs/transformers/model_doc/gpt2#transformers.GPT2Model.forward
+        Most of the parameters are inspired by https://huggingface.co/docs/transformers/model_doc/gpt2#transformers.GPT2Model.forward
 
         Args:
             input_ids (Tensor | None):         shape (n_batch, n_tokens). the tokenized input text
             attention_mask (Tensor | None):    shape (n_batch, n_tokens). 
-                Mask as produced by the tokenizer. Required when a batch of input strings are tokenized and thus padded at the end.
-                Then this will indicate the locations of 'real' tokens vs. the location of 'pad' tokens.
+                Mask as produced by the tokenizer. 
             media_locations (Tensor | None):   shape (n_batch, n_tokens).
                 indicates the locations of the starts of the <image> tags beginning, i.e. the location of the token representing '<'
             pixel_values (Tensor | None):    shape (b N T c h w). Optional.
@@ -233,7 +230,6 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
 
         Returns:
             (CausalLMOutputWithPast): an object containing all the useful stuff. Refer to hf documentation.
-
         """
 
         # sanity check
@@ -361,7 +357,6 @@ class FlamingoGPT2(FlamingoBaseModel):
             return self.lm.h
         return filter(lambda layer: isinstance(layer, ModifiedLMBlock), self.lm.h)
 
-
 class FlamingoOPT(FlamingoBaseModel):
     config: FlamingoConfig
     config_class = FlamingoConfig
@@ -476,7 +471,6 @@ class FlamingoModel(PreTrainedModel):
         loss_reduction: str = 'mean',
         **kwargs
     ) -> CausalLMOutputWithPast:
-        print(labels)
         return self.flamingo(
             input_ids=input_ids,
             attention_mask=attention_mask,

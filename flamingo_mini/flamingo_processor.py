@@ -35,21 +35,7 @@ class FlamingoProcessor:
         # self.eoc_token = eoc_token TODO what does this eoc mean
         self.vision_processor = CLIPImageProcessor() #type: ignore
         
-        if config.lm.startswith('gpt2'):
-            if use_fast:
-                from transformers import GPT2TokenizerFast
-
-                self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
-            else:
-                from transformers import GPT2Tokenizer
-
-                self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        elif config.lm.startswith('facebook/opt'):
-            from transformers import AutoTokenizer
-            
-            self.tokenizer = AutoTokenizer.from_pretrained('facebook/opt-30b', use_fast=use_fast)
-        elif config.lm.startswith('microsoft/biogpt'):
-            from transformers import AutoTokenizer
+        if config.lm.startswith('microsoft/biogpt'):
 
             self.tokenizer = BioGptTokenizer.from_pretrained('microsoft/biogpt')
         # self.tokenizer.add_bos_token = True                         #TODO what does this add_bos_token mean?

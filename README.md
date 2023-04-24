@@ -1,26 +1,16 @@
 # Flamingo mini
 
-Implementation of the `<a href="https://www.deepmind.com/blog/tackling-multiple-tasks-with-a-single-visual-language-model" target="blank">`deepmind  Flamingo `</a>` vision-language model, which enables an existing language model with to understand visual input such as images or videos. The code is based on `<a href="https://github.com/lucidrains/flamingo-pytorch" target="blank">`Lucidrains implementation `</a>` of the perceiver resampler and the gated cross-attention layers, and utilizes pretrained vision and language models from `<a href="https://huggingface.co/" target="blank">` 🤗 Hugging Face `</a>`. At the moment there are two versions available, based on GPT-2 and OPT. They have been tested with openai CLIP vision encoders `openai/clip-vit-base-patch32` and `openai/clip-vit-large-patch14`.
+Medical fields implementation of the deepmind  Flamingo vision-language model. The code is based on Lucidrains implementation of the perceiver resampler and the gated cross-attention layers, and utilizes pretrained vision and language models from Huggingface.
+
+At the moment I am running and testing codes on the MIMIC data.
 
 (!) Note that this repo is work in progress and may be subject to breaking changes.
 
-- [X] ~~provide simple training script -> currently in a separate branch: https://github.com/dhansmair/flamingo-mini/tree/training~~
-- [X] demo training script with huggingface trainer: https://github.com/dhansmair/flamingo-mini/tree/main/training
-- [ ] `<a href="https://huggingface.co/docs/transformers/v4.25.1/en/main_classes/pipelines" target="blank">`pipeline `</a>` integration
-- [ ] create chatting demo
+- [x] Add the medical vision and lm models
+- [ ] Report the detailed result
+- [ ] Move on other vision and LM models 
+- [ ] Model online
 
-## Demo
-
-A pretrained model is available at https://huggingface.co/dhansmair/flamingo-mini. You can find a demo of the model in `<a href="https://huggingface.co/spaces/dhansmair/flamingo-mini-cap" target="blank">`this hf space `</a>`.
-Disclaimer: This model was trained for image captioning on the `<a href="https://ai.google.com/research/ConceptualCaptions/" target="blank">`Conceptual Captions `</a>` dataset. In contrast, Deepmind's original flamingo models have been trained on huge interleaved image-text datasets which are not publicly accessible. Because of that, our model does not have the same few-shot capabilities, nor the exciting chatting abilities as the original.
-
-### Will there be a stronger pretrained model released?
-
-Unfortunately I don't have time at the moment to put more effort into model pretraining.
-For generative models that can ingest *single* images, there are other promising alternatives such as `<a href="https://huggingface.co/docs/transformers/main/model_doc/blip-2" target="blank">`BLIP-2 `</a>` which can already be used for inference/finetuning.
-The big selling point of Flamingo is the ability to handle interleaved vision-language data, but pretraining requires interleaved datasets, which we don't have at the moment.
-But apparently, Hugging Face is also working on replicating Flamingo: https://www.linkedin.com/posts/victor-sanh_multimodal-llm-deeplearning-activity-7038583909994885120-BjsF
-as well as LAION: https://laion.ai/blog/open-flamingo/
 
 ## Install
 
@@ -32,31 +22,15 @@ cd flamingo-mini
 pip install .
 ```
 
-## Usage
-
-The implementation aims to be compatible with the Hugging Face transformers library and largely adopts their api. It inherits `PreTrainedModel`, so you can use methods such as `save_pretrained()`, `from_pretrained()` and `push_to_hub()`. Powered by hf transformers, the model is enabled with different text generation strategies such as beam search and sampling strategies such as top-k sampling.
-
-```python
-from flamingo_mini import FlamingoConfig, FlamingoModel, FlamingoProcessor
-
-# create a model for training
-device = ...
-config = FlamingoConfig(...)
-model = FlamingoModel(config)
-model.to(device)
-processor = FlamingoProcessor(config, device=device)
-```
-
 ### Parameters
 
 You can specify the architecture by passing the following parameters to FlamingoConfig() on `flamingo_mini/flamingo_processor.py`:
 
 ```python
-lm: str = 'gpt2'                    # select language model. Possible values: gpt2, gpt2-*, facebook/opt-*
-clip_model_type: str = 'openai/clip-vit-base-patch32'  
-                                    # vision encoder. Possible other: openai/clip-vit-large-patch14
-dim: int = 1024                     # length of a language token, depends on used language model which is just the n_positions
-dim_visual: int = 768               # length of a visual feature, depends on the vision encoder
+lm: str = ''                        # select language model. Possible values: BioMedGPT
+clip_model_type: str = ''           # vision encoder. Possible other: BioMedCLIP visual encoder
+dim: int =                          # length of a language token, depends on used language model which is just the n_positions
+dim_visual: int =                   # length of a visual feature, depends on the vision encoder
 xattn_every: int = 1                # frequency of interleaved xattn layers
 xattn_dim_head: int = 64
 xattn_heads: int = 8
@@ -75,33 +49,21 @@ freeze_vision_model: bool = True
 
 ```
 
-### Load pretrained image-captioning model
-
-```python
-model = FlamingoModel.from_pretrained('dhansmair/flamingo-mini')           # or flamingo-tiny
-processor = FlamingoProcessor(model.config)
-```
-
-Details about the model configurations: https://github.com/dhansmair/flamingo-mini/wiki/Model-Configurations
-A complete example is provided in `examples/image_captioning.py`.
-
 ## Training
 
 A core idea of Flamingo is to reuse off-the-shelf language model and vision encoder. As such, their weights are frozen during flamingo training, and only the perceiver resampler and the gated cross-attention layers are updated.
-We can do that by setting the parameters `freeze_language_model` and `freeze_vision_model`, which are True by default (There is also methods `model.freeze_lm()` and `model.freeze_vm()`).
-Note that in our implementation, this does not freeze the (shared) weights of lm_head / token embeddings, as the embedding for the `<EOC>` token needs to be learned.
-
-~~I am working on a training script with `<a href="https://huggingface.co/docs/transformers/main_classes/trainer" target="blank">`hf trainer `</a>`, and the current model is largely compatible with trainer.~~
-A basic training script is here: https://github.com/dhansmair/flamingo-mini/tree/hf_trainer
+We can do that by setting the parameters `freeze_language_model` and `freeze_vision_model`, which are True by default (There is also methods `model.freeze_lm()` and `model.freeze_vm()`). Note that, the embedding layers in the LM are also frozen.
 
 ### Using a different language model
 
-The FlamingoModel is implemented in such a way that no modification of the underlying language model's source code is necessary, so it should be relatively easy to extend the code to other models. However, some steps are required: Add a new `<EOC>` token to the vocabulary of tokenizer and language model. hf transformers offers a `resize_token_embeddings()` utility to adjust both the token embedding matrix and lm_head. FlamingoGPT2 and FlamingoOPT should give a good starting point. To inject the gated cross-attention layers, replace layers in the lm with wrappers using the `_init_layers()` method.
+The FlamingoModel is implemented in such a way that no modification of the underlying language model's source code is necessary, so it should be relatively easy to extend the code to other models. However, some steps are required: 
+
+1. BioMedCLIP visual encoder should give a good starting point. To inject the gated cross-attention layers, replace layers in the lm with wrappers using the `_init_layers()` method.
 Every language model comes with a specific tokenizer, so make sure to adapt FlamingoProcessor to use the correct tokenizer.
 
 ### Using a different vision encoder
 
-By default, the model uses the CLIP ViT-B vision encoder. A different encoder size can be set with the `clip_model_type` parameter.
+By default, the model uses the visual encoder in the BioMedCLIP. A different encoder size can be set with the `clip_model_type` parameter.
 If you want to use a completely different encoder, e.g. ResNet, you will need to adjust FlamingoProcessor and replace the `vision_processor` property.
 You will also need to replace the `vision_encoder` property of FlamingoBaseModel and override the method `encode_resample_visuals()`.
 
@@ -165,9 +127,66 @@ FlamingoBaseModel *-- CLIPVisionModel
 FlamingoBaseModel <|-- FlamingoBioGPT
 ```
 
-## Acknowledgements
+## Functions in FlamingoProcessor
 
-- The code is based on `<a href="https://github.com/lucidrains/flamingo-pytorch" targe="blank">`Lucidrains implementation `</a>` of the perceiver resampler and the gated cross-attention layers.
-- It utilizes pretrained vision and language models hosted on `<a href="https://huggingface.co/" target="blank">` 🤗 Hugging Face `</a>`.
-  - OPT: https://huggingface.co/facebook/opt-350m, https://huggingface.co/facebook/opt-125m
-  - CLIP ViT: https://huggingface.co/openai/clip-vit-large-patch14
+### `__init__(self, config: FlamingoConfig,)`: 
+
+1. Receive the flamingo configure and declare the `self.tokenizer`
+2. Declare the `self.vision_processor` which is used to process the input images
+
+### `__call__(self, config: FlamingoConfig,)`: 
+
+1. Process  images by the `self.vision_processor` and save the processed values in the `result['pixel_values']`
+2. Process the text by the `self.encode_text()` and save the processed values in the `result['input_ids'] = input_ids`, `result['media_locations']`, `result['attention_mask']` 
+
+### `encode_text(self,text: str | List[str], device: torch.device | None = None, max_length=None, length=None, return_tensors='pt' return_attention_mask=True)`: 
+
+1. Tokenize the input raw text
+2. Find the `<image>` location by the `get_media_locations()`
+
+### `prepare_caption`:
+
+1. Modify the format of the caption
+
+### `remove_tags(self, text)`:
+
+1. Delete the original tags
+
+### `preprocess_images(self, images)`:
+
+1. Input the images to the `self.vision_processor`
+
+## Functions in FlamingoBaseModel
+
+### `__init__(self, config: FlamingoConfig, suppress_warnings=True)`
+
+1. Declare the `self.vision_encoder`, `self.resampler`, 
+
+### `_init_layers(self, lm_layers: nn.ModuleList)`:
+
+1. Modify those layers in the lm, adding the xattention layer
+
+### `encode_resample_visuals(self, pixel_values: torch.Tensor)`
+
+1. reshape the size of input images for different situations and pass pixel values through vision encoder
+2. pass the features to the `self.resampler`
+
+### `forward(self, input_ids: torch.Tensor | None = None, attention_mask: torch.Tensor | None = None, media_locations: torch.Tensor | None = None, pixel_values: torch.Tensor | None = None,visual_features: torch.Tensor | None = None,head_mask: torch.Tensor | None = None,inputs_embeds: torch.Tensor | None = None,use_cache: bool = False,past_key_values: tuple | None = None,return_dict: bool = True,labels: torch.Tensor | None = None,loss_reduction: str = 'mean',**kwargs)`:
+
+1. Pass the visual features and lm features along layers in the lm layers
+
+## Functions in FlamingoBModel
+
+### ` __init__(self, config: FlamingoConfig, model_class: type | None = None)`:
+
+1. Declare `self.flamingo` by instantiating the `FlamingoBaseModel`
+
+### `prepare_inputs_for_generation(self,input_ids: torch.Tensor,media_locations: torch.Tensor | None = None,attention_mask: torch.Tensor | None = None,pixel_values: torch.Tensor | None = None,visual_features: torch.Tensor | None = None,past=None,past_key_values=None,**kwargs)`:
+
+
+
+### `generate_captions(self,processor: FlamingoProcessor,pixel_values: torch.Tensor | None = None,images: Image.Image | List[Image.Image] | None = None,prompt: str = "<image>",max_length: int = 150,num_beams: int = 1,device: torch.device | None = None,**kwargs)`:
+
+1. Give the prompt: `<image>`
+2. Acquqire the captions
+3. Details can be found in `transformers.gengeration.utils.GenerateMixin`
