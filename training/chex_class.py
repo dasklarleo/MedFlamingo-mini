@@ -55,18 +55,17 @@ class Chex:
             print('loading annotations into memory...')
             tic = time.time()
             with open(annotation_file, 'r') as f:
-                dataset = json.load(f)
+                dataset = json.load(f)[:10]
             print('Done (t={:0.2f}s)'.format(time.time()- tic))
             for i in range(len(dataset)):
                 txt_path=dataset[i]['txt_path']
-                self.img_dir='/home/leosher/桌面/chex_data'+(txt_path[6:]).replace('.json', '/')
+                self.img_dir='/public_bme/data/physionet.org/files/mimic-cxr-jpg/2.0.0/files'+(txt_path[6:]).replace('.json', '/')
                 files = os.listdir(self.img_dir)
                 files.remove('index.html')
                 for file_index in range(len(files)):
                     files[file_index] = self.img_dir + files[file_index]
 
-                self.dataset['images'][i]=({'file_name':files, 'annotation_id':i, 'id':i})
-                print(files)
+                self.dataset['images'][i]=({'file_name':files[0], 'annotation_id':i, 'id':i})# We only keep the first image, in the future we will add multiple image supprt
                 report = dataset[i]['report']
                 report = report.replace('Findings:\n', '')
                 report = report.replace('Impression:\n', '')
@@ -106,7 +105,6 @@ class Chex:
         """
         print('Converting ndarray to lists...')
         assert(type(data) == np.ndarray)
-        print(data.shape)
         assert(data.shape[1] == 7)
         N = data.shape[0]
         ann = []
@@ -121,32 +119,3 @@ class Chex:
                 }]
         return ann
 
-    def annToRLE(self, ann):
-        """
-        Convert annotation which can be polygons, uncompressed RLE to RLE.
-        :return: binary mask (numpy 2D array)
-        """
-        t = self.imgs[ann['image_id']]
-        h, w = t['height'], t['width']
-        segm = ann['segmentation']
-        if type(segm) == list:
-            # polygon -- a single object might consist of multiple parts
-            # we merge all parts into one mask rle code
-            rles = maskUtils.frPyObjects(segm, h, w)
-            rle = maskUtils.merge(rles)
-        elif type(segm['counts']) == list:
-            # uncompressed RLE
-            rle = maskUtils.frPyObjects(segm, h, w)
-        else:
-            # rle
-            rle = ann['segmentation']
-        return rle
-
-    def annToMask(self, ann):
-        """
-        Convert annotation which can be polygons, uncompressed RLE, or RLE to binary mask.
-        :return: binary mask (numpy 2D array)
-        """
-        rle = self.annToRLE(ann)
-        m = maskUtils.decode(rle)
-        return m

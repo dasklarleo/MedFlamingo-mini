@@ -11,17 +11,17 @@ import random
 import torch
 from torch.optim import AdamW
 from torch.utils.data import Dataset
-
+import os
 from torchvision import transforms as T
-from torchvision.datasets import CocoCaptions
-
+import sys
 import transformers
 from transformers import HfArgumentParser, CLIPImageProcessor
 from transformers.trainer import Trainer, TrainingArguments
 from transformers.optimization import get_constant_schedule_with_warmup
-
+sys.path.append('/public/bme/home/liuyx7/project/MedFlamingo-mini')
 from flamingo_mini import FlamingoConfig, FlamingoModel, FlamingoProcessor
-
+from transformers import CLIPImageProcessor
+from IPython import embed
 from eval import evaluate_image_captioning  # don't ask me why this import works
 
 import chex_dataset
@@ -29,60 +29,51 @@ from chex_dataset import ChexCaptions
 logger = logging.getLogger(__name__)
 
 
-# get images and annotations from https://cocodataset.org/#download
-COCO_ROOT      = '/media/leosher/soliddisk_data/CoCo'
-COCO_ANN_TRAIN = '/media/leosher/soliddisk_data/CoCo/annotations/captions_train2017.json'
-COCO_ANN_VAL   = '/media/leosher/soliddisk_data/CoCo/annotations/captions_val2017.json'
 
-chex_image_dir = '/home/leosher/桌面/chex_data'
+chex_image_dir = '/public_bme/data/physionet.org/files/mimic-cxr-jpg/2.0.0/files'
 
 class CLIPImageTransform:
     """ experimental. A transform that does apply the transforms of a default CLIPFeatureExtractor """
-    vision_processor: CLIPImageProcessor
+    vision_processor: CLIPImageProcessor()
 
     def __init__(self, clip_model_type: str):
-        self.vision_processor = CLIPImageProcessor.from_pretrained(clip_model_type) # TODO: add the BioMedClip
+        self.vision_processor =  CLIPImageProcessor()
 
     def __call__(self, image) -> torch.Tensor:
         return self.vision_processor(images=image, return_tensors="pt", padding=True)['pixel_values']
 
         
-def prepare_training_dataset(config: FlamingoConfig):
-    """ prepare a CocoCaptions training dataset """
+def prepare_dataset(config: FlamingoConfig, json_file:str):
     transform = T.Compose([
-        # T.RandomHorizontalFlip(),                       # add your favorite transforms
-        CLIPImageTransform(config.clip_model_type)
+        # add your favorite transforms
+        T.Resize((224,224)),
+        T.RandomHorizontalFlip(), 
+        T.ToTensor()
     ])
 
     def target_transform(captions):
-        return f"{random.choice(['', ' '])}<image>{random.choice(captions)}<EOC></s>"
-    train=ChexCaptions(
+        return f"{random.choice(['', ' '])}<image>{random.choice(captions)}</s>"
+    data=ChexCaptions(
         chex_image_dir, 
-        '/home/leosher/桌面/chex_data/test.json', 
+        json_file,
         transform=transform,
         target_transform=target_transform
     )
-    print(type(train))
-    print(train)
-    return train
+    return data
 
-def prepare_chex_training_dataset():
-    
-    pass
 
-def prepare_evaluation_dataset(config: FlamingoConfig):
-    return CocoCaptions(COCO_ROOT, COCO_ANN_VAL, 
-        transform=CLIPImageTransform(config.clip_model_type))
+
 
 class DataCollator:
     def __init__(self, config: FlamingoConfig):
         self.processor = FlamingoProcessor(config)
         
     def __call__(self, batch):
+        for i in range(len(batch)):
+            batch[i] = list (batch[i])
         pixel_values, sentences = zip(*batch) #[[[img-1.1,img-1.2]],[img-2.1]...],  [senten-1, senten-2]
         inputs = self.processor(text=sentences)
         pixel_values = torch.stack(pixel_values)
-        
         return dict(
             pixel_values=pixel_values,
             labels=inputs['input_ids'],
@@ -102,7 +93,7 @@ class FlamingoTrainer(Trainer):
     args: FlamingoTrainingArguments
     model: FlamingoModel
     processor: FlamingoProcessor
-    eval_dataset: CocoCaptions
+    eval_dataset: Dataset
     
     def evaluate(self,
         eval_dataset: Optional[Dataset] = None,
@@ -111,23 +102,13 @@ class FlamingoTrainer(Trainer):
     ) -> Dict[str, float]:
         """ override evaluation method to inject custom behavior. 
         """
-        metrics = evaluate_image_captioning(self.eval_dataset, self.model, 
-            prefix=self.args.eval_coco_captioning_prefix,
-            start=self.args.eval_coco_captioning_start,
-            end=self.args.eval_coco_captioning_end,
-            batch_size=self.args.per_device_eval_batch_size,
-            num_workers=self.args.dataloader_num_workers
-        )
-        metrics = {f"{metric_key_prefix}_{k}" : v for k, v in metrics.items()}
+        metrics ='TO BE DONE'
 
-        # HF trainer stuff from overridden method
-        self.log(metrics)
-        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
-        self._memory_tracker.stop_and_update_metrics(metrics)
         return metrics
     
     
 if __name__ == '__main__':
+    # os.environ["WANDB_DISABLED"] = "true"
     parser = HfArgumentParser(FlamingoTrainingArguments)
     training_args: FlamingoTrainingArguments
     training_args = parser.parse_args_into_dataclasses()[0]
@@ -135,7 +116,6 @@ if __name__ == '__main__':
     logging.basicConfig(
         format=f'%(asctime)s {training_args.run_name} %(message)s', 
         datefmt='%H:%M:%S',
-        force=True,
         level=logging.INFO,
         handlers=[
             logging.StreamHandler(),
@@ -151,10 +131,10 @@ if __name__ == '__main__':
 
     logger.info('loading model...')
     config = FlamingoConfig(
-        clip_model_type='openai/clip-vit-large-patch14',
-        lm='facebook/opt-125m',
-        dim=768,
-        dim_visual=1024,
+        clip_model_type='',
+        lm='microsoft/biogpt',
+        dim=1024,
+        dim_visual=512,
         xattn_act='sqrelu',
         resampler_act='sqrelu'
     )
@@ -165,11 +145,8 @@ if __name__ == '__main__':
     # datasets
     #################################################################
     logger.info('loading datasets...')
-    train_dataset = prepare_training_dataset(config) # train_dataset (`torch.utils.data.Dataset` or `torch.utils.data.IterableDataset`, *optional*):
-            # The dataset to use for training. If it is a [`~datasets.Dataset`], columns not accepted by the
-            # model.forward()` method are automatically removed.
-    eval_dataset = prepare_evaluation_dataset(config)
-    print(train_dataset[-1])
+    train_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/train.json')
+    test_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/test.json') 
     #################################################################
     # optimizer, scheduler, trainer
     #################################################################
@@ -179,7 +156,7 @@ if __name__ == '__main__':
         model,
         training_args,
         train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
+        eval_dataset=test_dataset,
         data_collator=DataCollator(config),
         # optimizers=(optimizer, scheduler)
     )

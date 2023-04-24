@@ -110,14 +110,14 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
     def freeze_lm(self):
         """ freeze weights of the language model.
 
-        (!) does not freeze token embedding matrix and gated xattn layers
+        (!) does not freeze token embedding matrix and gated xattn layers# TODO why??
         """
 
         for param in self.lm.parameters():
             param.requires_grad = False
 
         # lm_head shares weights with the embeddings so no need to unfreeze that as well
-        self.lm.get_input_embeddings().weight.requires_grad = True
+        # self.lm.get_input_embeddings().weight.requires_grad = True
 
         for xattn in self.get_modified_layers():
             for param in xattn.xattn_block.parameters():
@@ -175,7 +175,6 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
             #visual_features = self.vision_encoder(pixel_values).last_hidden_state         # (b N T) v d
             visual_features = self.vision_encoder(pixel_values)
             visual_features = visual_features.reshape(visual_features.shape[0],-1,visual_features.shape[-1])
-            print(visual_features.shape)
             #visual_features = self.vision_encoder(pixel_values)[0]
             #visual_features = visual_features.reshape(visual_features.shape[0],1,-1)#TODO: what is the v?
         # perceiver resampler
@@ -326,7 +325,7 @@ class FlamingoBioGPT(FlamingoBaseModel):
         base_lm: BioGptForCausalLM = BioGptForCausalLM.from_pretrained(config.lm)  # type: ignore
         
         assert self.config.dim == base_lm.config.hidden_size, \
-            f"specified {self.config.dim=} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.hidden_size}"
+            f"specified {self.config.dim} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.hidden_size}"
 
         base_lm.resize_token_embeddings(base_lm.config.vocab_size + 1)
         self.lm: BioGptModel = base_lm.biogpt
@@ -350,7 +349,7 @@ class FlamingoGPT2(FlamingoBaseModel):
         base_lm: GPT2LMHeadModel = GPT2LMHeadModel.from_pretrained(config.lm)  # type: ignore
         
         assert self.config.dim == base_lm.config.n_embd, \
-            f"specified {self.config.dim=} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.n_embd}"
+            f"specified {self.config.dim} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.n_embd}"
 
         base_lm.resize_token_embeddings(base_lm.config.vocab_size + 1)
         self.lm: GPT2Model = base_lm.transformer
@@ -375,7 +374,7 @@ class FlamingoOPT(FlamingoBaseModel):
         base_lm: OPTForCausalLM = OPTForCausalLM.from_pretrained(config.lm)  # type: ignore
 
         assert self.config.dim == base_lm.config.hidden_size, \
-            f"specified {self.config.dim=} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.hidden_size}"
+            f"specified {self.config.dim} in FlamingoConfig, but {config.lm} has hidden size={base_lm.config.hidden_size}"
 
         base_lm.resize_token_embeddings(base_lm.config.vocab_size + 1)
         self.lm: OPTModel = base_lm.model
@@ -419,7 +418,7 @@ class FlamingoModel(PreTrainedModel):
                 If none, it will choose FlamingoGPT2 or FlamingoOPT  or BioGPT based on the FlamingoConfig. Defaults to None.
         """
         super().__init__(config)
-        print(isinstance(config,PretrainedConfig))
+
         if model_class is None:
             model_class = self._find_flamingo_class(config.lm)
         self.flamingo: FlamingoBaseModel = model_class(config)
@@ -477,7 +476,7 @@ class FlamingoModel(PreTrainedModel):
         loss_reduction: str = 'mean',
         **kwargs
     ) -> CausalLMOutputWithPast:
-
+        print(labels)
         return self.flamingo(
             input_ids=input_ids,
             attention_mask=attention_mask,

@@ -4,9 +4,9 @@ from PIL import Image
 
 import torch
 from transformers import CLIPImageProcessor
-
-from medclip import MedCLIPModel, MedCLIPVisionModelViT
-from medclip import MedCLIPProcessor
+from transformers import BioGptTokenizer, BioGptForCausalLM
+#from medclip import MedCLIPModel, MedCLIPVisionModelViT
+#from medclip import MedCLIPProcessor
 from .configuration_flamingo import FlamingoConfig
 
 
@@ -32,7 +32,7 @@ class FlamingoProcessor:
             eoc_token (str): string representation of the token to add.
         """
         self.config = config
-        self.eoc_token = eoc_token
+        # self.eoc_token = eoc_token TODO what does this eoc mean
         self.vision_processor = CLIPImageProcessor() #type: ignore
         
         if config.lm.startswith('gpt2'):
@@ -51,10 +51,10 @@ class FlamingoProcessor:
         elif config.lm.startswith('microsoft/biogpt'):
             from transformers import AutoTokenizer
 
-            self.tokenizer = AutoTokenizer.from_pretrained('microsoft/biogpt', use_fast=use_fast)
-        self.tokenizer.add_bos_token = True
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.tokenizer.add_tokens(self.eoc_token)
+            self.tokenizer = BioGptTokenizer.from_pretrained('microsoft/biogpt')
+        # self.tokenizer.add_bos_token = True                         #TODO what does this add_bos_token mean?
+        # self.tokenizer.pad_token = self.tokenizer.eos_token         #TODO why do they do this replacement?
+        # self.tokenizer.add_tokens(self.eoc_token)                   #TODO what does this eoc do?
 
         # find the start token for "<image>". " <" is 1279, "<" is 27
         # the encoded "<" token-id is different if there is a preceding whitespace.
@@ -106,14 +106,17 @@ class FlamingoProcessor:
     def prepare_caption(self, caption: str) -> str:
         # <BOS> token is added automatically by the tokenizer.
         # <EOS> token is not.
-        return "<image>" + caption + self.eoc_token + self.tokenizer.eos_token
+        # return "<image>" + caption + self.eoc_token + self.tokenizer.eos_token
+        return "<image>" + caption + self.tokenizer.eos_token #TODO what does this eoc mean
             
     def prepare_captions(self, captions: List[str]) -> List[str]:
         """preparation function for the conceptual captions dataset. """
         return [self.prepare_caption(c) for c in captions]
         
     def _remove_tags(self, text: str) -> str:
-        for s in ('<image>', self.tokenizer.eos_token, self.eoc_token, self.tokenizer.pad_token):
+        # for s in ('<image>', self.tokenizer.eos_token, self.eoc_token, self.tokenizer.pad_token):
+        #     text = text.replace(s, '')
+        for s in ('<image>', self.tokenizer.eos_token, self.tokenizer.pad_token):
             text = text.replace(s, '')
         return text.strip()
     
