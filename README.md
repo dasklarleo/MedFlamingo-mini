@@ -86,8 +86,8 @@ class FlamingoProcessor {
 }
 class CLIPVisionModel
 class CLIPImageProcessor
-FlamingoProcessor *-- BioGPTTokenizer
-FlamingoProcessor *-- CLIPImageProcessor
+FlamingoProcessor <|-- BioGPTTokenizer
+FlamingoProcessor <|--CLIPImageProcessor
 
 class FlamingoModel {
   FlamingoConfig config
@@ -123,7 +123,7 @@ class FlamingoBioGPT {
   get_modified_layers()
 }
 FlamingoModel *-- FlamingoBaseModel
-FlamingoBaseModel *-- CLIPVisionModel
+FlamingoBaseModel <|-- CLIPVisionModel
 FlamingoBaseModel <|-- FlamingoBioGPT
 ```
 
