@@ -1,10 +1,11 @@
 from __future__ import annotations
+
 from typing import List, Tuple
-from PIL import Image
 
 import torch
-from transformers import CLIPImageProcessor
-from transformers import BioGptTokenizer, BioGptForCausalLM
+from PIL import Image
+from transformers import BioGptForCausalLM, BioGptTokenizer, CLIPImageProcessor
+
 #from medclip import MedCLIPModel, MedCLIPVisionModelViT
 #from medclip import MedCLIPProcessor
 from .configuration_flamingo import FlamingoConfig

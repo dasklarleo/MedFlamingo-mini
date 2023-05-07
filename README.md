@@ -190,3 +190,9 @@ FlamingoBaseModel <|-- FlamingoBioGPT
 1. Give the prompt: `<image>`
 2. Acquqire the captions
 3. Details can be found in `transformers.gengeration.utils.GenerateMixin`
+
+## Chex Dataset
+
+1. `self.dataset = {'images':{},'annotations':{}}`
+2. `self.anns = dict()`
+3. `self.imgs = dict({'file':[], 'annotation_id':int, 'id':int})`

@@ -12,16 +12,18 @@ ARGS="
 --warmup_steps 5000
 --lr_scheduler_type constant_with_warmup
 --per_device_train_batch_size 16
---per_device_eval_batch_size 64
+--per_device_eval_batch_size 16
 --gradient_accumulation_steps 1
 --evaluation_strategy steps
---eval_steps 1000
---save_strategy epoch
+--eval_steps 200
+--save_strategy steps
+--save_steps 1000
 --save_total_limit 2
---log_level info
+--log_level passive
 --dataloader_num_workers 4
---dataloader_pin_memory True
+--dataloader_pin_memory False
 --fp16
+--report_to wandb
 --ddp_find_unused_parameters False
 "
 

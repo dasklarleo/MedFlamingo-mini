@@ -1,10 +1,10 @@
-import os.path
-from typing import Any, Callable, List, Optional, Tuple
 import sys
+from typing import Any, Callable, List, Optional, Tuple
+
+from chex_class import Chex
 from PIL import Image
 #sys.path.append('/home/leosher/桌面/project/MedFlamingo-mini/training/')
 from torchvision.datasets.vision import VisionDataset
-from chex_class import Chex
 
 
 class ChexPert(VisionDataset):
@@ -23,14 +23,14 @@ class ChexPert(VisionDataset):
     def __init__(
         self,
         root: str,
-        annFile: str,
+        dataset_path:str,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
         transforms: Optional[Callable] = None,
     ) -> None:
         super().__init__(root, transforms, transform, target_transform)
 
-        self.coco = Chex(annFile)
+        self.coco = Chex(dataset_path)
         self.ids = list(sorted(self.coco.anns.keys()))
 
     def _load_image(self, id: int) -> Image.Image:
@@ -46,13 +46,13 @@ class ChexPert(VisionDataset):
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         id = self.ids[index]
-        image = self._load_image(id) # TODO Add different images
+        images = self._load_image(id) # TODO Add different images
         target = self._load_target(id)
 
         if self.transforms is not None:
-            image, target = self.transforms(image, target)
+            images, target = self.transforms(images, target)
 
-        return image, target
+        return images, target
 
     def __len__(self) -> int:
         return len(self.ids)

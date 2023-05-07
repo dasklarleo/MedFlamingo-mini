@@ -4,30 +4,32 @@ Use Huggingface Trainer with FlamingoModel.
 This is a working demo script which you can adapt to your needs.
 """
 import logging
+import os
+import random
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Tuple
-import random
 
 import torch
+import transformers
 from torch.optim import AdamW
 from torch.utils.data import Dataset
-import os
 from torchvision import transforms as T
-import sys
-import transformers
-from transformers import HfArgumentParser, CLIPImageProcessor
-from transformers.trainer import Trainer, TrainingArguments
+from transformers import CLIPImageProcessor, HfArgumentParser
 from transformers.optimization import get_constant_schedule_with_warmup
-sys.path.append('/public/bme/home/liuyx7/project/MedFlamingo-mini')
-from flamingo_mini import FlamingoConfig, FlamingoModel, FlamingoProcessor
-from transformers import CLIPImageProcessor
-from IPython import embed
-from eval import evaluate_image_captioning  # don't ask me why this import works
+from transformers.trainer import Trainer, TrainingArguments
 
+sys.path.append('/public/bme/home/liuyx7/project/MedFlamingo-mini')
 import chex_dataset
 from chex_dataset import ChexCaptions
-logger = logging.getLogger(__name__)
+from eval import \
+    evaluate_image_captioning  # don't ask me why this import works
+from flamingo_mini import FlamingoConfig, FlamingoModel, FlamingoProcessor
+from IPython import embed
+from transformers import CLIPImageProcessor
 
+logger = logging.getLogger(__name__)
+os.environ["WANDB_MODE"] = "offline"
 
 
 chex_image_dir = '/public_bme/data/physionet.org/files/mimic-cxr-jpg/2.0.0/files'
@@ -43,21 +45,21 @@ class CLIPImageTransform:
         return self.vision_processor(images=image, return_tensors="pt", padding=True)['pixel_values']
 
         
-def prepare_dataset(config: FlamingoConfig, json_file:str):
+def prepare_dataset(config: FlamingoConfig, data_path:str):
     transform = T.Compose([
         # add your favorite transforms
         T.Resize((224,224)),
-        T.RandomHorizontalFlip(), 
+        # T.RandomHorizontalFlip(), TODO Add the horizontaoFlip in both image and captions
         T.ToTensor()
     ])
 
     def target_transform(captions):
-        return f"{random.choice(['', ' '])}<image>{random.choice(captions)}</s>"
+        return f"{random.choice(['', ' '])}<image>{random.choice(captions)}</s>" # Each image group may contain several captions
     data=ChexCaptions(
-        chex_image_dir, 
-        json_file,
+        chex_image_dir,
+        data_path,
         transform=transform,
-        target_transform=target_transform
+        target_transform=target_transform,
     )
     return data
 
@@ -84,9 +86,11 @@ class DataCollator:
 @dataclass
 class FlamingoTrainingArguments(TrainingArguments):
     """ custom arguments """
+    eval_coco_captioning_prefix: str = field(default="<image> Diagnosis report:")         # It's a common thing to do for COCO image captioning
     eval_coco_captioning_start: int = field(default=0)
     eval_coco_captioning_end: int = field(default=1000)
     
+    num_train_epochs: float = field(default=100)    
 
 class FlamingoTrainer(Trainer):
 
@@ -95,24 +99,13 @@ class FlamingoTrainer(Trainer):
     processor: FlamingoProcessor
     eval_dataset: Dataset
     
-    def evaluate(self,
-        eval_dataset: Optional[Dataset] = None,
-        ignore_keys: Optional[List[str]] = None,
-        metric_key_prefix: str = "eval"
-    ) -> Dict[str, float]:
-        """ override evaluation method to inject custom behavior. 
-        """
-        metrics ='TO BE DONE'
-
-        return metrics
-    
-    
 if __name__ == '__main__':
     # os.environ["WANDB_DISABLED"] = "true"
+    os.environ["WANDB_MODE"] = "offline"
     parser = HfArgumentParser(FlamingoTrainingArguments)
     training_args: FlamingoTrainingArguments
     training_args = parser.parse_args_into_dataclasses()[0]
-
+    print(training_args.eval_steps)
     logging.basicConfig(
         format=f'%(asctime)s {training_args.run_name} %(message)s', 
         datefmt='%H:%M:%S',
@@ -130,13 +123,14 @@ if __name__ == '__main__':
     logger.info(str(training_args))
 
     logger.info('loading model...')
-    config = FlamingoConfig(
+    config = FlamingoConfig( #detailed in file configuration_flamingo.py. This config is passed to the FlamingoModel in modeling_flamingo.py
         clip_model_type='',
         lm='microsoft/biogpt',
         dim=1024,
         dim_visual=512,
         xattn_act='sqrelu',
-        resampler_act='sqrelu'
+        resampler_act='sqrelu',
+        freeze_vision_model=False
     )
     model = FlamingoModel(config)
     model.train()
@@ -145,9 +139,9 @@ if __name__ == '__main__':
     # datasets
     #################################################################
     logger.info('loading datasets...')
-    train_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/train.json')
-    test_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/test.json') 
-    #################################################################
+    train_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/mimic.pkl')
+    eval_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/mimic_test_1000.pkl') 
+    ##  ###############################################################
     # optimizer, scheduler, trainer
     #################################################################
 
@@ -156,8 +150,8 @@ if __name__ == '__main__':
         model,
         training_args,
         train_dataset=train_dataset,
-        eval_dataset=test_dataset,
-        data_collator=DataCollator(config),
+        eval_dataset = eval_dataset,
+        data_collator= DataCollator(config),
         # optimizers=(optimizer, scheduler)
     )
 

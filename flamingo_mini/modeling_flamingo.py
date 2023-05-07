@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List
 import contextlib
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List
 
+import open_clip
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,20 +13,19 @@ from einops import rearrange, repeat
 from einops_exts import repeat_many
 from PIL import Image
 from transformers import PreTrainedModel
-from transformers.models.clip.modeling_clip import CLIPVisionModel
-from transformers.modeling_outputs import (
-    BaseModelOutputWithPast,
-    CausalLMOutputWithPast
-)
-import open_clip
 from transformers.configuration_utils import PretrainedConfig
-#from VisualModels.ChexPert import load_pretrain_ChexPert
+from transformers.modeling_outputs import (BaseModelOutputWithPast,
+                                           CausalLMOutputWithPast)
+from transformers.models.clip.modeling_clip import CLIPVisionModel
 
 from .configuration_flamingo import FlamingoConfig
 from .flamingo_processor import FlamingoProcessor
 from .gated_cross_attention import ModifiedLMBlock
 from .perceiver_resampler import PerceiverResampler
 from .utils import get_common_prefix_length
+
+#from VisualModels.ChexPert import load_pretrain_ChexPert
+
 
 
 

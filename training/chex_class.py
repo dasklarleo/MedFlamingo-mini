@@ -13,21 +13,20 @@
 # Throughout the API "ann"=annotation, "cat"=category, and "img"=image.
 # Help on each functions can be accessed by: "help COCO>function".
 
-# See also COCO>decodeMask,
-# COCO>encodeMask, COCO>getAnnIds, 
-# COCO>getImgIds, COCO>loadAnns, 
-# COCO>loadImgs, COCO>annToMask, COCO>showAnns
 
 
-import json
-import time
-import numpy as np
+
 import copy
 import itertools
-import pycocotools.mask as maskUtils
+import json
 import os
-from collections import defaultdict
 import sys
+import time
+from collections import defaultdict
+import pickle
+import numpy as np
+import pycocotools.mask as maskUtils
+
 PYTHON_VERSION = sys.version_info[0]
 if PYTHON_VERSION == 2:
     from urllib import urlretrieve
@@ -40,7 +39,7 @@ def _isArrayLike(obj):
 
 
 class Chex:
-    def __init__(self, annotation_file=None):
+    def __init__(self,dataset_path):
         """
         Constructor of Microsoft COCO helper class for reading and visualizing annotations.
         :param annotation_file (str): location of annotation file
@@ -51,27 +50,16 @@ class Chex:
         self.dataset,self.anns,self.imgs = {'images':{},'annotations':{}},dict(),dict()
         self.imgToAnns = defaultdict(list)
         self.img_dir=''
-        if not annotation_file == None:
+        if not dataset_path == None:
             print('loading annotations into memory...')
             tic = time.time()
-            with open(annotation_file, 'r') as f:
-                dataset = json.load(f)[:10]
+            with open(dataset_path, 'rb') as f:  
+                self.dataset = pickle.loads(f.read())
+            
             print('Done (t={:0.2f}s)'.format(time.time()- tic))
-            for i in range(len(dataset)):
-                txt_path=dataset[i]['txt_path']
-                self.img_dir='/public_bme/data/physionet.org/files/mimic-cxr-jpg/2.0.0/files'+(txt_path[6:]).replace('.json', '/')
-                files = os.listdir(self.img_dir)
-                files.remove('index.html')
-                for file_index in range(len(files)):
-                    files[file_index] = self.img_dir + files[file_index]
-
-                self.dataset['images'][i]=({'file_name':files[0], 'annotation_id':i, 'id':i})# We only keep the first image, in the future we will add multiple image supprt
-                report = dataset[i]['report']
-                report = report.replace('Findings:\n', '')
-                report = report.replace('Impression:\n', '')
-                self.dataset['annotations'][i]=({'id':i, 'annotations': report})
         self.anns = self.dataset['annotations']
         self.imgs = self.dataset['images']
+        
 
 
 
