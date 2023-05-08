@@ -3,11 +3,11 @@ from tqdm import tqdm
 
 import torch
 from torch.utils.data import Dataset, Subset, DataLoader
-from torchvision.datasets import CocoCaptions
-from pycocoevalcap.eval import COCOEvalCap
 
 from flamingo_mini import FlamingoModel, FlamingoProcessor
-
+import sys
+sys.path.append('/public/bme/home/liuyx7/project/MedFlamingo-mini/metrics') 
+from bleu import Bleu
 
 class MyDatasetWrapper(Dataset):
 
@@ -18,26 +18,27 @@ class MyDatasetWrapper(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, index):
-        image, _ = self.dataset[index]
+        image, reference = self.dataset[index]
         image_id = self.dataset.ids[index]
-        return image_id, image
+        return image_id, image, reference
 
 
 @torch.no_grad()
 def evaluate_image_captioning(
-    dataset: CocoCaptions,
+    dataset,
     model: FlamingoModel, 
     *,
-    prefix: str = "<image>",
+    prefix: str = "<Report of chest X-ray image>",
     start = 0,
     end: Optional[int] = None,
     verbose: bool = True,
     batch_size: int = 64,
-    num_workers: int = 8, 
+    num_workers: int = 4, 
 ) -> Dict[str, float]:
 
     processor = FlamingoProcessor(model.config)
-    results: List[dict] = []
+    results = []
+    ground_truths = []
     
     wrapper = MyDatasetWrapper(dataset)
     wrapper = Subset(wrapper, range(start, end if end is not None else len(wrapper)))
@@ -45,19 +46,17 @@ def evaluate_image_captioning(
         wrapper, batch_size=batch_size, shuffle=False, drop_last=False, pin_memory=True,
         num_workers=num_workers)
 
-    for image_ids, pixels in tqdm(loader, disable=not verbose):
+    for image_ids, pixels, references in tqdm(loader, disable=not verbose):
         captions = model.generate_captions(
             processor, 
             pixel_values=pixels.to(model.device),
             prompt=prefix
         )
-        
-        for image_id, caption in zip(image_ids.tolist(), captions):
-            results.append(dict(image_id=image_id, caption=caption))
-
-    coco_result = dataset.coco.loadRes(results)
-    coco_eval = COCOEvalCap(dataset.coco, coco_result)
-    coco_eval.params['image_id'] = coco_result.getImgIds()
-    coco_eval.evaluate()
-    return coco_eval.eval
+        for c in captions:
+            results.append(c)
+        for r in references:
+            ground_truths.append([r])
+    bleu_metrics = Bleu()
+    
+    return bleu_metrics.compute(predictions = results, references = ground_truths)
 

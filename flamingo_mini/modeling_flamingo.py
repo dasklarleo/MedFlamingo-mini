@@ -114,7 +114,8 @@ class FlamingoBaseModel(ABC, PreTrainedModel):
 
         for param in self.lm.parameters():
             param.requires_grad = False
-
+            
+        self.lm.get_input_embeddings().weight.requires_grad = True
         # lm_head shares weights with the embeddings so no need to unfreeze that as well
         # self.lm.get_input_embeddings().weight.requires_grad = True
 

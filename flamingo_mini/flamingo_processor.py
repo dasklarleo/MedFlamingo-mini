@@ -35,7 +35,7 @@ class FlamingoProcessor:
         self.config = config
         # self.eoc_token = eoc_token TODO what does this eoc mean
         self.vision_processor = CLIPImageProcessor() #type: ignore
-        
+        self.prompt = "<Diagnosis report of chest X-ray>"
         if config.lm.startswith('microsoft/biogpt'):
 
             self.tokenizer = BioGptTokenizer.from_pretrained('microsoft/biogpt')
@@ -87,14 +87,13 @@ class FlamingoProcessor:
             
             
         media_locs = self.get_media_locations(result.input_ids)
-
         return result.input_ids.to(device), media_locs.to(device), result.attention_mask.to(device)
     
     def prepare_caption(self, caption: str) -> str:
         # <BOS> token is added automatically by the tokenizer.
         # <EOS> token is not.
         # return "<image>" + caption + self.eoc_token + self.tokenizer.eos_token
-        return "<image>" + caption + self.tokenizer.eos_token #TODO what does this eoc mean
+        return self.prompt + caption + self.tokenizer.eos_token #TODO what does this eoc mean
             
     def prepare_captions(self, captions: List[str]) -> List[str]:
         """preparation function for the conceptual captions dataset. """
@@ -103,7 +102,7 @@ class FlamingoProcessor:
     def _remove_tags(self, text: str) -> str:
         # for s in ('<image>', self.tokenizer.eos_token, self.eoc_token, self.tokenizer.pad_token):
         #     text = text.replace(s, '')
-        for s in ('<image>', self.tokenizer.eos_token, self.tokenizer.pad_token):
+        for s in (self.prompt, self.tokenizer.eos_token, self.tokenizer.pad_token):
             text = text.replace(s, '')
         return text.strip()
     
@@ -114,6 +113,7 @@ class FlamingoProcessor:
             return [self._remove_tags(t) for t in text]
     
     def get_media_locations(self, input_ids: torch.Tensor) -> torch.Tensor:
+        # input_ids: tokenized sentences
         return torch.stack([(input_ids == leq_id) for leq_id in self.leq_ids]).sum(0)
     
     def preprocess_images(self, images: List[Image.Image]) -> torch.Tensor:

@@ -55,11 +55,10 @@ class Chex:
             tic = time.time()
             with open(dataset_path, 'rb') as f:  
                 self.dataset = pickle.loads(f.read())
-            
+                
             print('Done (t={:0.2f}s)'.format(time.time()- tic))
         self.anns = self.dataset['annotations']
         self.imgs = self.dataset['images']
-        
 
 
 

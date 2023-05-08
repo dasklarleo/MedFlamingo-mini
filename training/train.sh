@@ -4,7 +4,7 @@ export CUDA_VISIBLE_DEVICES=0
 NUM_GPU=1
 
 ARGS="
---output_dir ./flamingo-coco
+--output_dir ./MedFlamingo
 --run_name flamingo-tiny-vitL
 --do_train 
 --optim adamw_torch
@@ -15,12 +15,12 @@ ARGS="
 --per_device_eval_batch_size 16
 --gradient_accumulation_steps 1
 --evaluation_strategy steps
---eval_steps 200
+--eval_steps 100
 --save_strategy steps
 --save_steps 1000
 --save_total_limit 2
 --log_level passive
---dataloader_num_workers 4
+--dataloader_num_workers 1
 --dataloader_pin_memory False
 --fp16
 --report_to wandb

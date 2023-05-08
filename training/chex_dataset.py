@@ -30,11 +30,11 @@ class ChexPert(VisionDataset):
     ) -> None:
         super().__init__(root, transforms, transform, target_transform)
 
-        self.coco = Chex(dataset_path)
-        self.ids = list(sorted(self.coco.anns.keys()))
+        self.chex = Chex(dataset_path)
+        self.ids = list(sorted(self.chex.anns.keys()))
 
     def _load_image(self, id: int) -> Image.Image:
-        file_name = self.coco.loadImgs(id)[0]["file_name"]
+        file_name = self.chex.loadImgs(id)[0]["file_name"]
         i = 0
         # TODO Add multiple images
         
@@ -42,7 +42,7 @@ class ChexPert(VisionDataset):
         return  Image.open(file_name).convert("RGB")#[ H, W, 3]
     
     def _load_target(self, id: int) -> List[Any]:
-        return self.coco.loadAnns(id)
+        return self.chex.loadAnns(id)
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         id = self.ids[index]

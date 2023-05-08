@@ -23,7 +23,7 @@ sys.path.append('/public/bme/home/liuyx7/project/MedFlamingo-mini')
 import chex_dataset
 from chex_dataset import ChexCaptions
 from eval import \
-    evaluate_image_captioning  # don't ask me why this import works
+    evaluate_image_captioning  
 from flamingo_mini import FlamingoConfig, FlamingoModel, FlamingoProcessor
 from IPython import embed
 from transformers import CLIPImageProcessor
@@ -54,7 +54,7 @@ def prepare_dataset(config: FlamingoConfig, data_path:str):
     ])
 
     def target_transform(captions):
-        return f"{random.choice(['', ' '])}<image>{random.choice(captions)}</s>" # Each image group may contain several captions
+        return f"{random.choice(['', ' '])}<Diagnosis report of chest X-ray>{random.choice(captions)}</s>" # Each image group may contain several captions
     data=ChexCaptions(
         chex_image_dir,
         data_path,
@@ -62,9 +62,6 @@ def prepare_dataset(config: FlamingoConfig, data_path:str):
         target_transform=target_transform,
     )
     return data
-
-
-
 
 class DataCollator:
     def __init__(self, config: FlamingoConfig):
@@ -86,11 +83,11 @@ class DataCollator:
 @dataclass
 class FlamingoTrainingArguments(TrainingArguments):
     """ custom arguments """
-    eval_coco_captioning_prefix: str = field(default="<image> Diagnosis report:")         # It's a common thing to do for COCO image captioning
-    eval_coco_captioning_start: int = field(default=0)
-    eval_coco_captioning_end: int = field(default=1000)
+    captioning_prefix: str = field(default="<Diagnosis report of chest X-ray>")         # It's a common thing to do for COCO image captioning
+    captioning_start: int = field(default=0)
+    #captioning_end: int = field(default=1000)
     
-    num_train_epochs: float = field(default=100)    
+    num_train_epochs: float = field(default=10)    
 
 class FlamingoTrainer(Trainer):
 
@@ -98,6 +95,29 @@ class FlamingoTrainer(Trainer):
     model: FlamingoModel
     processor: FlamingoProcessor
     eval_dataset: Dataset
+    def evaluate(self,
+        eval_dataset: Optional[Dataset] = None,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "eval"
+    ) -> Dict[str, float]:
+        """
+        override evaluation method to inject custom behavior. 
+        """
+        metrics = evaluate_image_captioning(self.eval_dataset, self.model, 
+            prefix=self.args.captioning_prefix,
+            start=self.args.captioning_start,
+            end=None,
+            batch_size=self.args.per_device_eval_batch_size,
+            num_workers=self.args.dataloader_num_workers
+        )
+        
+        metrics = {f"{metric_key_prefix}_{k}" : v for k, v in metrics.items()}
+
+        # HF trainer stuff from overridden method
+        self.log(metrics)
+        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
+        self._memory_tracker.stop_and_update_metrics(metrics)
+        return metrics
     
 if __name__ == '__main__':
     # os.environ["WANDB_DISABLED"] = "true"
@@ -105,7 +125,6 @@ if __name__ == '__main__':
     parser = HfArgumentParser(FlamingoTrainingArguments)
     training_args: FlamingoTrainingArguments
     training_args = parser.parse_args_into_dataclasses()[0]
-    print(training_args.eval_steps)
     logging.basicConfig(
         format=f'%(asctime)s {training_args.run_name} %(message)s', 
         datefmt='%H:%M:%S',
@@ -140,7 +159,7 @@ if __name__ == '__main__':
     #################################################################
     logger.info('loading datasets...')
     train_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/mimic.pkl')
-    eval_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/mimic_test_1000.pkl') 
+    eval_dataset = prepare_dataset(config,'/public/bme/home/liuyx7/data/chex_data/mimic_test_100.pkl') 
     ##  ###############################################################
     # optimizer, scheduler, trainer
     #################################################################
@@ -160,7 +179,5 @@ if __name__ == '__main__':
     #################################################################
     logger.info('start training.')
 
-    if training_args.resume_from_checkpoint is not None:
-        trainer.train(training_args.resume_from_checkpoint)
-    else:
-        trainer.train()
+    
+    trainer.train()
