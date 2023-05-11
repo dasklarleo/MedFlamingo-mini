@@ -600,6 +600,7 @@ class FlamingoModel(PreTrainedModel):
                 images = [images]
 
             pixel_values = processor(images=images, device=device)['pixel_values']
+            print(pixel_values)
 
         assert pixel_values is not None, "you must pass either images or visual features to generate_captions()!"
 
